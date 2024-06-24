@@ -1,7 +1,6 @@
 import sys
-sys.path.append('./')
+sys.path.append('/home/jupyter/trials/IDM-VTON/')
 from PIL import Image
-import gradio as gr
 from src.tryon_pipeline import StableDiffusionXLInpaintPipeline as TryonPipeline
 from src.unet_hacked_garmnet import UNet2DConditionModel as UNet2DConditionModel_ref
 from src.unet_hacked_tryon import UNet2DConditionModel
@@ -27,6 +26,7 @@ from detectron2.data.detection_utils import convert_PIL_to_numpy,_apply_exif_ori
 from torchvision.transforms.functional import to_pil_image
 
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+print(device)
 
 def pil_to_binary_mask(pil_image, threshold=0):
     np_image = np.array(pil_image)
@@ -91,6 +91,8 @@ UNet_Encoder = UNet2DConditionModel_ref.from_pretrained(
     subfolder="unet_encoder",
     torch_dtype=torch.float16,
 )
+print('loaded')
+
 
 parsing_model = Parsing(0)
 openpose_model = OpenPose(0)
@@ -129,8 +131,8 @@ def start_tryon(dict,garm_img,garment_des,is_checked,is_checked_crop,denoise_ste
     pipe.to(device)
     pipe.unet_encoder.to(device)
 
-    garm_img= garm_img.convert("RGB").resize((768,1024))
-    human_img_orig = dict["background"].convert("RGB")    
+    garm_img = Image.open(garm_img).convert("RGB").resize((768,1024))
+    human_img_orig = Image.open(dict["background"]).convert("RGB")    
     
     if is_checked_crop:
         width, height = human_img_orig.size
@@ -165,7 +167,7 @@ def start_tryon(dict,garm_img,garment_des,is_checked,is_checked_crop,denoise_ste
      
     
 
-    args = apply_net.create_argument_parser().parse_args(('show', './configs/densepose_rcnn_R_50_FPN_s1x.yaml', './ckpt/densepose/model_final_162be9.pkl', 'dp_segm', '-v', '--opts', 'MODEL.DEVICE', 'cuda'))
+    args = apply_net.create_argument_parser().parse_args(('show', '/home/jupyter/trials/IDM-VTON/configs/densepose_rcnn_R_50_FPN_s1x.yaml', './ckpt/densepose/model_final_162be9.pkl', 'dp_segm', '-v', '--opts', 'MODEL.DEVICE', 'cuda'))
     # verbosity = getattr(args, "verbosity", None)
     pose_img = args.func(args,human_img_arg)    
     pose_img = pose_img[:,:,::-1]    
@@ -233,6 +235,7 @@ def start_tryon(dict,garm_img,garment_des,is_checked,is_checked_crop,denoise_ste
                         guidance_scale=2.0,
                     )[0]
 
+    images[0].save("first.png")
     if is_checked_crop:
         out_img = images[0].resize(crop_size)        
         human_img_orig.paste(out_img, (int(left), int(top)))    
@@ -258,56 +261,70 @@ for ex_human in human_list_path:
 ##default human
 
 
-image_blocks = gr.Blocks().queue()
-with image_blocks as demo:
-    gr.Markdown("## IDM-VTON 👕👔👚")
-    gr.Markdown("Virtual Try-on with your image and garment image. Check out the [source codes](https://github.com/yisol/IDM-VTON) and the [model](https://huggingface.co/yisol/IDM-VTON)")
-    with gr.Row():
-        with gr.Column():
-            imgs = gr.ImageEditor(sources='upload', type="pil", label='Human. Mask with pen or use auto-masking', interactive=True)
-            with gr.Row():
-                is_checked = gr.Checkbox(label="Yes", info="Use auto-generated mask (Takes 5 seconds)",value=True)
-            with gr.Row():
-                is_checked_crop = gr.Checkbox(label="Yes", info="Use auto-crop & resizing",value=False)
+#image_blocks = gr.Blocks().queue()
 
-            example = gr.Examples(
-                inputs=imgs,
-                examples_per_page=10,
-                examples=human_ex_list
-            )
-
-        with gr.Column():
-            garm_img = gr.Image(label="Garment", sources='upload', type="pil")
-            with gr.Row(elem_id="prompt-container"):
-                with gr.Row():
-                    prompt = gr.Textbox(placeholder="Description of garment ex) Short Sleeve Round Neck T-shirts", show_label=False, elem_id="prompt")
-            example = gr.Examples(
-                inputs=garm_img,
-                examples_per_page=8,
-                examples=garm_list_path)
-        with gr.Column():
-            # image_out = gr.Image(label="Output", elem_id="output-img", height=400)
-            masked_img = gr.Image(label="Masked image output", elem_id="masked-img",show_share_button=False)
-        with gr.Column():
-            # image_out = gr.Image(label="Output", elem_id="output-img", height=400)
-            image_out = gr.Image(label="Output", elem_id="output-img",show_share_button=False)
+#imgs should have "background", is_che
+start_tryon(dict = {"background" : "/home/jupyter/trials/IDM-VTON/examples/human/vton_trial.png"}, 
+            garm_img = "/home/jupyter/trials/IDM-VTON/examples/human/vton_trial.png", 
+            garment_des = "woman wearing hoodie", 
+            is_checked=True, 
+            is_checked_crop=True, 
+            denoise_steps=25, 
+            seed=0) #, outputs=[image_out,masked_img], api_name='tryon'
+#(dict,garm_img,garment_des,is_checked,is_checked_crop,denoise_steps,seed):
 
 
 
 
-    with gr.Column():
-        try_button = gr.Button(value="Try-on")
-        with gr.Accordion(label="Advanced Settings", open=False):
-            with gr.Row():
-                denoise_steps = gr.Number(label="Denoising Steps", minimum=20, maximum=40, value=30, step=1)
-                seed = gr.Number(label="Seed", minimum=-1, maximum=2147483647, step=1, value=42)
+# with image_blocks as demo:
+#     gr.Markdown("## IDM-VTON 👕👔👚")
+#     gr.Markdown("Virtual Try-on with your image and garment image. Check out the [source codes](https://github.com/yisol/IDM-VTON) and the [model](https://huggingface.co/yisol/IDM-VTON)")
+#     with gr.Row():
+#         with gr.Column():
+#             imgs = gr.ImageEditor(sources='upload', type="pil", label='Human. Mask with pen or use auto-masking', interactive=True)
+#             with gr.Row():
+#                 is_checked = gr.Checkbox(label="Yes", info="Use auto-generated mask (Takes 5 seconds)",value=True)
+#             with gr.Row():
+#                 is_checked_crop = gr.Checkbox(label="Yes", info="Use auto-crop & resizing",value=False)
+
+#             example = gr.Examples(
+#                 inputs=imgs,
+#                 examples_per_page=10,
+#                 examples=human_ex_list
+#             )
+
+#         with gr.Column():
+#             garm_img = gr.Image(label="Garment", sources='upload', type="pil")
+#             with gr.Row(elem_id="prompt-container"):
+#                 with gr.Row():
+#                     prompt = gr.Textbox(placeholder="Description of garment ex) Short Sleeve Round Neck T-shirts", show_label=False, elem_id="prompt")
+#             example = gr.Examples(
+#                 inputs=garm_img,
+#                 examples_per_page=8,
+#                 examples=garm_list_path)
+#         with gr.Column():
+#             # image_out = gr.Image(label="Output", elem_id="output-img", height=400)
+#             masked_img = gr.Image(label="Masked image output", elem_id="masked-img",show_share_button=False)
+#         with gr.Column():
+#             # image_out = gr.Image(label="Output", elem_id="output-img", height=400)
+#             image_out = gr.Image(label="Output", elem_id="output-img",show_share_button=False)
 
 
 
-    try_button.click(fn=start_tryon, inputs=[imgs, garm_img, prompt, is_checked,is_checked_crop, denoise_steps, seed], outputs=[image_out,masked_img], api_name='tryon')
+
+#     with gr.Column():
+#         try_button = gr.Button(value="Try-on")
+#         with gr.Accordion(label="Advanced Settings", open=False):
+#             with gr.Row():
+#                 denoise_steps = gr.Number(label="Denoising Steps", minimum=20, maximum=40, value=30, step=1)
+#                 seed = gr.Number(label="Seed", minimum=-1, maximum=2147483647, step=1, value=42)
+
+
+
+#     try_button.click(fn=start_tryon, inputs=[imgs, garm_img, prompt, is_checked,is_checked_crop, denoise_steps, seed], outputs=[image_out,masked_img], api_name='tryon')
 
             
 
 
-image_blocks.launch()
+# image_blocks.launch()
 
