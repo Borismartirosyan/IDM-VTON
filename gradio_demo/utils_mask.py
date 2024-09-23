@@ -155,6 +155,7 @@ def get_mask_location(model_type, category, model_parse: Image.Image, keypoint: 
 
     parse_mask = np.logical_and(parser_mask_changeable, np.logical_not(parse_mask))
 
+    Image.fromarray(parse_mask).save('mask.png')
     parse_mask_total = np.logical_or(parse_mask, parser_mask_fixed)
     inpaint_mask = 1 - parse_mask_total
     img = np.where(inpaint_mask, 255, 0)

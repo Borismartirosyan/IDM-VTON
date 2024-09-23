@@ -212,7 +212,7 @@ def start_tryon(dict,garm_img,garment_des,is_checked,is_checked_crop,denoise_ste
                         )
 
 
-
+                    print(human_img.size, mask.size())
                     pose_img =  tensor_transfrom(pose_img).unsqueeze(0).to(device,torch.float16)
                     garm_tensor =  tensor_transfrom(garm_img).unsqueeze(0).to(device,torch.float16)
                     generator = torch.Generator(device).manual_seed(seed) if seed is not None else None
